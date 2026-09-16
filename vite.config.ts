@@ -7,10 +7,14 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   build: {
     target: 'es2022',
-    minify: true,
+    minify: 'esbuild',
+    cssCodeSplit: true,
+    modulePreload: {
+      polyfill: true,
+    },
     rollupOptions: {
       output: {
-        manualChunks(id) {
+        manualChunks(id: string) {
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
             return 'vendor-react';
           }
@@ -25,4 +29,8 @@ export default defineConfig({
     },
     chunkSizeWarningLimit: 1000,
   },
-});
+  test: {
+    globals: true,
+    environment: 'happy-dom',
+  },
+} as any);
