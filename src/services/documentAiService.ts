@@ -15,8 +15,32 @@ export interface DocumentAiParseResult {
   ocrConfidence: number;
 }
 
+/** Maximum number of clause segments analyzed concurrently to prevent API overload. */
+const MAX_CONCURRENT_CLAUSE_ANALYSIS = 3;
+
 /**
- * Google Cloud Document AI & OCR Handler with LRU Cache for peak performance
+ * Processes an array in bounded batches to enforce concurrency limits.
+ * Prevents Promise.all from firing unlimited parallel requests simultaneously.
+ */
+async function batchedPromiseAll<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += concurrency) {
+    const batch = items.slice(i, i + concurrency);
+    const batchResults = await Promise.all(
+      batch.map((item, batchIdx) => mapper(item, i + batchIdx))
+    );
+    results.push(...batchResults);
+  }
+  return results;
+}
+
+/**
+ * Google Cloud Document AI & OCR Handler with LRU Cache for peak performance.
+ * Uses bounded concurrency (max 3 parallel clause analyses) to prevent API overload.
  */
 export async function parseDocumentWithDocumentAi(
   fileContent: string,
@@ -24,7 +48,7 @@ export async function parseDocumentWithDocumentAi(
   userJurisdiction?: CountryCode
 ): Promise<DocumentAiParseResult> {
   const detectedJurisdiction = detectJurisdictionFromText(fileContent);
-  const activeJurisdiction = detectedJurisdiction || userJurisdiction || DEFAULT_JURISDICTION;
+  const activeJurisdiction = detectedJurisdiction ?? userJurisdiction ?? DEFAULT_JURISDICTION;
 
   // Check LRU cache for 0ms cached result
   const cached = analysisCache.get<DocumentAiParseResult>(fileContent, activeJurisdiction);
@@ -36,15 +60,18 @@ export async function parseDocumentWithDocumentAi(
 
   // Try parsing JSON format first
   try {
-    const jsonObj = JSON.parse(fileContent);
+    const jsonObj = JSON.parse(fileContent) as { evaluatedClauses?: unknown[] };
     if (jsonObj && Array.isArray(jsonObj.evaluatedClauses)) {
-      extractedClauses = jsonObj.evaluatedClauses.map((c: any, idx: number) => ({
-        ...c,
-        id: c.id || `docai-json-${Date.now()}-${idx}`,
-        jurisdictionCode: c.jurisdictionCode || activeJurisdiction,
-        humanStatus: c.humanStatus || 'pending',
-        isRemediated: Boolean(c.isRemediated)
-      }));
+      extractedClauses = (jsonObj.evaluatedClauses as Record<string, unknown>[]).map(
+        (c, idx) => ({
+          ...(c as unknown as FlaggedClause),
+          id: (c['id'] as string | undefined) ?? `docai-json-${Date.now()}-${idx}`,
+          jurisdictionCode:
+            (c['jurisdictionCode'] as CountryCode | undefined) ?? activeJurisdiction,
+          humanStatus: (c['humanStatus'] as FlaggedClause['humanStatus'] | undefined) ?? 'pending',
+          isRemediated: Boolean(c['isRemediated']),
+        })
+      );
     }
   } catch {
     // Unstructured text parsing via Document AI segmentation
@@ -54,42 +81,45 @@ export async function parseDocumentWithDocumentAi(
   if (extractedClauses.length === 0) {
     const paragraphs = fileContent
       .split(/\n\s*\n|(?=\b(?:Section|Clause|Article|\d+\.)\s+[A-Z])/)
-      .map(p => p.trim())
-      .filter(p => p.length > 40 && !p.startsWith('{') && !p.startsWith('}'));
+      .map((p) => p.trim())
+      .filter((p) => p.length > 40 && !p.startsWith('{') && !p.startsWith('}'));
 
     const rawClauses = paragraphs.length > 0 ? paragraphs : [fileContent];
 
-    extractedClauses = await Promise.all(
-      rawClauses.map(async (textSnippet, index) => {
+    // Use bounded concurrency instead of unbounded Promise.all
+    extractedClauses = await batchedPromiseAll(
+      rawClauses,
+      MAX_CONCURRENT_CLAUSE_ANALYSIS,
+      async (textSnippet, index) => {
         const analysis = await analyzeClauseWithGemini(textSnippet, activeJurisdiction);
         return {
           id: `docai-clause-${Date.now()}-${index}`,
-          section: analysis.section || `Clause #${index + 1}`,
-          primaryCategory: analysis.primaryCategory || 'CONTRACT_RISK',
-          relatedCategories: analysis.relatedCategories || ['CONTRACT_RISK'],
+          section: analysis.section ?? `Clause #${index + 1}`,
+          primaryCategory: analysis.primaryCategory ?? 'CONTRACT_RISK',
+          relatedCategories: analysis.relatedCategories ?? ['CONTRACT_RISK'],
           clauseText: textSnippet,
-          simplifiedText: analysis.simplifiedText || textSnippet,
-          jargonTerms: analysis.jargonTerms || [],
-          riskLevel: analysis.riskLevel || 'medium',
-          riskScore: analysis.riskScore || 50,
-          ragRequirement: analysis.ragRequirement || 'Commercial compliance standard.',
-          ragCitation: analysis.ragCitation || 'Document AI Legal Standard',
-          aiVerdict: analysis.aiVerdict || 'Standard contractual review.',
-          aiConfidence: analysis.aiConfidence || 0.92,
+          simplifiedText: analysis.simplifiedText ?? textSnippet,
+          jargonTerms: analysis.jargonTerms ?? [],
+          riskLevel: analysis.riskLevel ?? 'medium',
+          riskScore: analysis.riskScore ?? 50,
+          ragRequirement: analysis.ragRequirement ?? 'Commercial compliance standard.',
+          ragCitation: analysis.ragCitation ?? 'Document AI Legal Standard',
+          aiVerdict: analysis.aiVerdict ?? 'Standard contractual review.',
+          aiConfidence: analysis.aiConfidence ?? 0.92,
           benchmarkSource: fileName,
-          suggestedRevision: analysis.suggestedRevision || textSnippet,
-          revisionRationale: analysis.revisionRationale || 'Document AI suggested revision.',
-          negotiationPaths: analysis.negotiationPaths || {
+          suggestedRevision: analysis.suggestedRevision ?? textSnippet,
+          revisionRationale: analysis.revisionRationale ?? 'Document AI suggested revision.',
+          negotiationPaths: analysis.negotiationPaths ?? {
             aggressive: { text: 'Request deletion or redrafting.', rationale: 'Protects buyer.', riskReduction: '90%' },
             balanced: { text: 'Modify to standard term.', rationale: 'Commercial compromise.', riskReduction: '75%' },
             conservative: { text: 'Accept term with fee cap.', rationale: 'Low friction.', riskReduction: '40%' }
           },
-          guardrail: analysis.guardrail || { isAmbiguous: false, targetedAdvocateQuestions: [] },
+          guardrail: analysis.guardrail ?? { isAmbiguous: false, targetedAdvocateQuestions: [] },
           jurisdictionCode: activeJurisdiction,
-          humanStatus: 'pending',
+          humanStatus: 'pending' as const,
           isRemediated: false
-        };
-      })
+        } satisfies FlaggedClause;
+      }
     );
   }
 
@@ -98,7 +128,11 @@ export async function parseDocumentWithDocumentAi(
 
   const result: DocumentAiParseResult = {
     fileName,
-    fileType: fileName.endsWith('.json') ? 'JSON Audit Report' : fileName.endsWith('.pdf') ? 'PDF Document (OCR)' : 'Text/Markdown Document',
+    fileType: fileName.endsWith('.json')
+      ? 'JSON Audit Report'
+      : fileName.endsWith('.pdf')
+      ? 'PDF Document (OCR)'
+      : 'Text/Markdown Document',
     rawText: fileContent,
     detectedJurisdiction,
     extractedClauses,
@@ -116,13 +150,14 @@ export async function parseDocumentWithDocumentAi(
  * Heuristic Date & Milestone Extractor
  */
 export function extractMilestoneDates(_text: string): MilestoneDate[] {
-  const dates: MilestoneDate[] = [];
+  const now = Date.now();
+  const ONE_DAY = 86_400_000;
 
-  dates.push(
+  return [
     {
       id: 'date-1',
       title: 'Contract Effective Date',
-      date: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
+      date: new Date(now + ONE_DAY * 2).toISOString().split('T')[0],
       type: 'milestone',
       clauseSection: 'Section 1.1',
       description: 'Official commencement of agreement term and obligations.'
@@ -130,7 +165,7 @@ export function extractMilestoneDates(_text: string): MilestoneDate[] {
     {
       id: 'date-2',
       title: 'Annual Contract Renewal Window',
-      date: new Date(Date.now() + 86400000 * 335).toISOString().split('T')[0],
+      date: new Date(now + ONE_DAY * 335).toISOString().split('T')[0],
       type: 'renewal',
       clauseSection: 'Section 3.2',
       description: 'Mandatory 30-day notice required to prevent automatic 12-month auto-renewal.'
@@ -138,7 +173,7 @@ export function extractMilestoneDates(_text: string): MilestoneDate[] {
     {
       id: 'date-3',
       title: 'Termination Notice Deadline',
-      date: new Date(Date.now() + 86400000 * 305).toISOString().split('T')[0],
+      date: new Date(now + ONE_DAY * 305).toISOString().split('T')[0],
       type: 'termination_notice',
       clauseSection: 'Section 3.4',
       description: 'Last date to submit written notice of non-renewal without incurring cancellation penalty.'
@@ -146,12 +181,10 @@ export function extractMilestoneDates(_text: string): MilestoneDate[] {
     {
       id: 'date-4',
       title: 'Quarterly DPDP Compliance Audit Due',
-      date: new Date(Date.now() + 86400000 * 90).toISOString().split('T')[0],
+      date: new Date(now + ONE_DAY * 90).toISOString().split('T')[0],
       type: 'compliance_audit',
       clauseSection: 'Section 12.3',
       description: 'Mandatory data protection officer audit of sub-processor telemetry logs.'
     }
-  );
-
-  return dates;
+  ];
 }

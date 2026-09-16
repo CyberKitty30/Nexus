@@ -93,10 +93,9 @@ export default function App() {
   }, [clauses]);
 
   // ==========================================
-  // MEMOIZED HANDLERS
+  // MEMOIZED HANDLERS FOR STABLE PROP REFERENCES
   // ==========================================
 
-  // Document AI OCR & Text Parse Handler
   const handleParseDocumentText = useCallback(
     async (text: string, title: string) => {
       setIsAuditing(true);
@@ -125,9 +124,8 @@ export default function App() {
     [activeCountry.code]
   );
 
-  // Preset Load Handler
   const handleLoadPreset = useCallback((presetId: string) => {
-    const preset = SAMPLE_CONTRACT_PRESETS.find((p) => p.id === presetId) || SAMPLE_CONTRACT_PRESETS[0];
+    const preset = SAMPLE_CONTRACT_PRESETS.find((p) => p.id === presetId) ?? SAMPLE_CONTRACT_PRESETS[0];
     setIsAuditing(true);
     setContractFileName(preset.name);
     setActiveCountry(SUPPORTED_COUNTRIES[preset.jurisdictionCode]);
@@ -141,7 +139,6 @@ export default function App() {
     }, 250);
   }, []);
 
-  // Switch Active Country
   const handleSwitchJurisdiction = useCallback((code: CountryCode) => {
     const country = SUPPORTED_COUNTRIES[code];
     if (country) {
@@ -150,7 +147,6 @@ export default function App() {
     }
   }, []);
 
-  // Human Review Actions
   const handleReviewAction = useCallback((id: string, status: HumanStatus, notes: string) => {
     setClauses((prev) =>
       prev.map((c) =>
@@ -179,6 +175,35 @@ export default function App() {
     );
   }, []);
 
+  // Modal controls
+  const handleOpenJurisdictionModal = useCallback(() => setShowJurisdictionModal(true), []);
+  const handleCloseJurisdictionModal = useCallback(() => setShowJurisdictionModal(false), []);
+
+  const handleOpenApiKeyModal = useCallback(() => setShowApiKeyModal(true), []);
+  const handleCloseApiKeyModal = useCallback(() => setShowApiKeyModal(false), []);
+
+  const handleCloseGuardrailModal = useCallback(() => setSelectedGuardrailClause(null), []);
+  const handleCloseRevisionModal = useCallback(() => setSelectedRevisionClause(null), []);
+
+  const handleDismissAutoJurisdiction = useCallback(() => setDetectedCountryCode(null), []);
+
+  const handleAutoJurisdictionSwitch = useCallback(
+    (code: CountryCode) => {
+      handleSwitchJurisdiction(code);
+      setDetectedCountryCode(null);
+    },
+    [handleSwitchJurisdiction]
+  );
+
+  const handleSelectClauseFromDashboard = useCallback((id: string) => {
+    setActiveClauseId(id);
+    setActiveTab('audit');
+  }, []);
+
+  const handleExportReport = useCallback(() => {
+    downloadExecutiveAuditReport(contractFileName, activeCountry, clauses, beforeScore, afterScore);
+  }, [contractFileName, activeCountry, clauses, beforeScore, afterScore]);
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 md:p-6 selection:bg-sky-500 selection:text-slate-950">
       <div className="max-w-7xl mx-auto">
@@ -188,11 +213,9 @@ export default function App() {
         {/* WORKBENCH HEADER */}
         <Header
           activeCountry={activeCountry}
-          onOpenJurisdictionModal={() => setShowJurisdictionModal(true)}
-          onOpenApiKeyModal={() => setShowApiKeyModal(true)}
-          onExportReport={() =>
-            downloadExecutiveAuditReport(contractFileName, activeCountry, clauses, beforeScore, afterScore)
-          }
+          onOpenJurisdictionModal={handleOpenJurisdictionModal}
+          onOpenApiKeyModal={handleOpenApiKeyModal}
+          onExportReport={handleExportReport}
           hasApiKey={Boolean(geminiApiKey)}
         />
 
@@ -201,11 +224,8 @@ export default function App() {
           <AutoJurisdictionBanner
             detectedCode={detectedCountryCode}
             activeCode={activeCountry.code}
-            onSwitchJurisdiction={(code) => {
-              handleSwitchJurisdiction(code);
-              setDetectedCountryCode(null);
-            }}
-            onDismiss={() => setDetectedCountryCode(null)}
+            onSwitchJurisdiction={handleAutoJurisdictionSwitch}
+            onDismiss={handleDismissAutoJurisdiction}
           />
         )}
 
@@ -232,10 +252,7 @@ export default function App() {
               <DashboardOverview
                 clauses={clauses}
                 activeCountry={activeCountry}
-                onSelectClause={(id) => {
-                  setActiveClauseId(id);
-                  setActiveTab('audit');
-                }}
+                onSelectClause={handleSelectClauseFromDashboard}
                 beforeScore={beforeScore}
                 afterScore={afterScore}
               />
@@ -299,28 +316,28 @@ export default function App() {
       {/* MODALS */}
       <JurisdictionSelector
         isOpen={showJurisdictionModal}
-        onClose={() => setShowJurisdictionModal(false)}
+        onClose={handleCloseJurisdictionModal}
         activeCountry={activeCountry}
         onSelectCountry={handleSwitchJurisdiction}
       />
 
       <ApiKeyModal
         isOpen={showApiKeyModal}
-        onClose={() => setShowApiKeyModal(false)}
+        onClose={handleCloseApiKeyModal}
         apiKey={geminiApiKey}
         onSaveApiKey={setGeminiApiKey}
       />
 
       <StatutoryGuardrailModal
         isOpen={Boolean(selectedGuardrailClause)}
-        onClose={() => setSelectedGuardrailClause(null)}
+        onClose={handleCloseGuardrailModal}
         clause={selectedGuardrailClause}
         country={activeCountry}
       />
 
       <RevisionModal
         isOpen={Boolean(selectedRevisionClause)}
-        onClose={() => setSelectedRevisionClause(null)}
+        onClose={handleCloseRevisionModal}
         clause={selectedRevisionClause}
         country={activeCountry}
         onApplyRevision={handleToggleRemediated}

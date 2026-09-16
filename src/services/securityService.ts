@@ -8,50 +8,66 @@ export interface SecuritySanitizeResult {
   sanitizedText: string;
   hasViolation: boolean;
   violations: string[];
+  threatType?: 'PROMPT_INJECTION' | 'SCRIPT_EXECUTION' | 'PAYLOAD_OVERFLOW';
 }
 
+const PROMPT_INJECTION_PATTERNS = [
+  /ignore\s+all\s+previous\s+instructions/gi,
+  /ignore\s+previous\s+instructions/gi,
+  /disregard\s+all\s+prior\s+rules/gi,
+  /disregard\s+the\s+above/gi,
+  /you\s+are\s+now\s+in\s+developer\s+mode/gi,
+  /you\s+are\s+now\s+a/gi,
+  /system\s*:\s*override/gi,
+  /system\s+prompt\s+override/gi,
+  /jailbreak/gi,
+];
+
 class SecurityService {
-  private requestTimestamps: number[] = [];
-  private readonly maxRequestsPerMinute = 60;
+  private rateLimitMap = new Map<string, number>();
 
   /**
    * Sanitizes user and document text against XSS, HTML injection, and prompt injection attempts.
    */
-  public sanitizeInput(input: string): SecuritySanitizeResult {
+  public sanitizeInput(input: string, maxCharLimit = 50000): SecuritySanitizeResult {
     if (!input || typeof input !== 'string') {
       return { sanitizedText: '', hasViolation: false, violations: [] };
     }
 
     const violations: string[] = [];
+    let threatType: 'PROMPT_INJECTION' | 'SCRIPT_EXECUTION' | 'PAYLOAD_OVERFLOW' | undefined;
+    let workingText = input;
 
-    // Check for XSS / Script tags
-    if (/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi.test(input) || /javascript:/gi.test(input)) {
+    // 1. Check payload size boundary
+    if (workingText.length > maxCharLimit) {
+      violations.push(`Payload truncated to maximum allowed size of ${maxCharLimit} characters.`);
+      threatType = 'PAYLOAD_OVERFLOW';
+      workingText = workingText.slice(0, maxCharLimit);
+    }
+
+    // 2. Check for XSS / Script tags
+    if (/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi.test(workingText) || /javascript:/gi.test(workingText) || /eval\s*\(/gi.test(workingText)) {
       violations.push('XSS script execution payload detected');
+      threatType = 'SCRIPT_EXECUTION';
     }
 
     // Check for HTML event handler injections
-    if (/on\w+\s*=\s*["'][^"']*["']/gi.test(input)) {
+    if (/on\w+\s*=\s*["'][^"']*["']/gi.test(workingText)) {
       violations.push('HTML event handler injection detected');
+      if (!threatType) threatType = 'SCRIPT_EXECUTION';
     }
 
-    // Check for Prompt Injection / Override directives
-    const promptInjectionPatterns = [
-      /ignore previous instructions/gi,
-      /disregard all prior rules/gi,
-      /you are now in developer mode/gi,
-      /system prompt override/gi,
-      /jailbreak/gi,
-    ];
-
-    for (const pattern of promptInjectionPatterns) {
-      if (pattern.test(input)) {
+    // 3. Check for Prompt Injection / Override directives and replace with REDACTED placeholder
+    for (const pattern of PROMPT_INJECTION_PATTERNS) {
+      if (pattern.test(workingText)) {
         violations.push('Prompt injection or instruction override payload detected');
-        break;
+        if (!threatType) threatType = 'PROMPT_INJECTION';
+        workingText = workingText.replace(pattern, '[REDACTED_SECURITY_RISK]');
       }
     }
 
-    // Perform safe HTML entity encoding
-    let sanitizedText = input
+    // 4. Perform safe HTML entity encoding
+    const sanitizedText = workingText
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
@@ -63,6 +79,7 @@ class SecurityService {
       sanitizedText,
       hasViolation: violations.length > 0,
       violations,
+      threatType,
     };
   }
 
@@ -84,17 +101,17 @@ class SecurityService {
   }
 
   /**
-   * Enforces client-side rate limiting to prevent spam and denial of service.
+   * Enforces client-side rate limiting per client ID to prevent spam and denial of service.
    */
-  public checkRateLimit(): boolean {
+  public checkRateLimit(clientId = 'default_client', limitMs = 500): boolean {
     const now = Date.now();
-    this.requestTimestamps = this.requestTimestamps.filter((ts) => now - ts < 60000);
+    const lastTimestamp = this.rateLimitMap.get(clientId) ?? 0;
 
-    if (this.requestTimestamps.length >= this.maxRequestsPerMinute) {
-      return false; // Rate limit exceeded
+    if (now - lastTimestamp < limitMs) {
+      return false; // Rate limit exceeded (throttled)
     }
 
-    this.requestTimestamps.push(now);
+    this.rateLimitMap.set(clientId, now);
     return true;
   }
 
@@ -104,8 +121,15 @@ class SecurityService {
   public isValidApiKeyFormat(key: string): boolean {
     if (!key || typeof key !== 'string') return false;
     const trimmed = key.trim();
-    // Valid Gemini API key format check (starts with AIza and contains ~39 chars)
     return /^AIzaSy[A-Za-z0-9_-]{33}$/.test(trimmed);
+  }
+
+  /**
+   * Masks sensitive API keys for UI display
+   */
+  public maskApiKey(apiKey: string): string {
+    if (!apiKey || apiKey.length < 8) return '****';
+    return `${apiKey.slice(0, 4)}...${apiKey.slice(-4)}`;
   }
 }
 

@@ -10,12 +10,12 @@ interface CacheEntry<T> {
 }
 
 class AnalysisCacheService {
-  private cache = new Map<string, CacheEntry<any>>();
-  private maxEntries = 50;
-  private ttlMs = 1000 * 60 * 30; // 30 minutes TTL
+  private cache = new Map<string, CacheEntry<unknown>>();
+  private readonly maxEntries = 50;
+  private readonly ttlMs = 1000 * 60 * 30; // 30 minutes TTL
 
   /**
-   * Generates a deterministic hash key for document text and jurisdiction
+   * Generates a deterministic, non-negative hash key for document text and jurisdiction
    */
   private generateKey(text: string, jurisdiction: string): string {
     let hash = 0;
@@ -23,13 +23,14 @@ class AnalysisCacheService {
     for (let i = 0; i < combined.length; i++) {
       const char = combined.charCodeAt(i);
       hash = (hash << 5) - hash + char;
-      hash |= 0; // Convert to 32bit integer
+      hash >>>= 0; // Convert to unsigned 32-bit integer
     }
     return `analysis_${hash}_${combined.length}`;
   }
 
   /**
-   * Retrieve cached result if available and fresh
+   * Retrieve cached result if available and fresh.
+   * Refreshes insertion order to maintain true LRU behavior.
    */
   public get<T>(text: string, jurisdiction: string): T | null {
     const key = this.generateKey(text, jurisdiction);
@@ -41,23 +42,35 @@ class AnalysisCacheService {
       return null;
     }
 
+    // Refresh position in Map to mark as recently used
+    this.cache.delete(key);
+    this.cache.set(key, entry);
+
     return entry.data as T;
   }
 
   /**
-   * Store analysis result in cache
+   * Store analysis result in cache with LRU eviction policy.
    */
   public set<T>(text: string, jurisdiction: string, data: T): void {
     const key = this.generateKey(text, jurisdiction);
-    if (this.cache.size >= this.maxEntries) {
+
+    // If key already exists, delete so it gets re-added at the end (most recent)
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    } else if (this.cache.size >= this.maxEntries) {
+      // Evict oldest (least recently used) entry
       const oldestKey = this.cache.keys().next().value;
-      if (oldestKey) this.cache.delete(oldestKey);
+      if (oldestKey !== undefined) {
+        this.cache.delete(oldestKey);
+      }
     }
+
     this.cache.set(key, { data, timestamp: Date.now() });
   }
 
   /**
-   * Clear cache entries
+   * Clear all cache entries
    */
   public clear(): void {
     this.cache.clear();
