@@ -193,7 +193,7 @@ export default function App() {
           />
 
           {/* TAB WORKSPACE CONTENT */}
-          <main className="flex-1 min-w-0">
+          <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 outline-none">
             {activeTab === 'dashboard' && (
               <DashboardOverview
                 clauses={clauses}

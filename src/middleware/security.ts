@@ -1,5 +1,5 @@
 /**
- * Security Middleware & Input Sanitization
+ * Security Middleware & Input Sanitization Engine
  * Enforces zero hardcoded secrets, prompt injection defense, XSS protection, and payload boundaries.
  */
 
@@ -19,6 +19,8 @@ const PROMPT_INJECTION_PATTERNS = [
   /<script[\s\S]*?>[\s\S]*?<\/script>/gi,
   /javascript\s*:/i,
   /onerror\s*=/i,
+  /eval\s*\(/i,
+  /exec\s*\(/i,
 ];
 
 /**
@@ -47,7 +49,7 @@ export function sanitizeInput(rawInput: string, maxCharLimit = 50000): Sanitizat
   for (const pattern of PROMPT_INJECTION_PATTERNS) {
     if (pattern.test(sanitized)) {
       threatDetected = true;
-      detectedType = pattern.source.includes('script') || pattern.source.includes('javascript')
+      detectedType = pattern.source.includes('script') || pattern.source.includes('javascript') || pattern.source.includes('eval')
         ? 'SCRIPT_EXECUTION'
         : 'PROMPT_INJECTION';
       sanitized = sanitized.replace(pattern, '[REDACTED_SECURITY_RISK]');
@@ -71,16 +73,39 @@ export function sanitizeInput(rawInput: string, maxCharLimit = 50000): Sanitizat
 }
 
 /**
- * Validates Environment Secret Configuration
+ * Validates Environment Secret Configuration securely without leaks
  */
 export function getValidatedEnvironmentSecret(keyName: string): string | null {
-  if (typeof process !== 'undefined' && process.env) {
+  if (typeof process !== 'undefined' && process.env && process.env[keyName]) {
     const val = process.env[keyName];
-    if (val && val.trim() !== '') return val;
+    if (val && val.trim() !== '') return val.trim();
   }
-  if (typeof import.meta !== 'undefined' && (import.meta as any).env) {
-    const val = (import.meta as any).env[keyName];
-    if (val && val.trim() !== '') return val;
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[keyName]) {
+    const val = String(import.meta.env[keyName]);
+    if (val && val.trim() !== '') return val.trim();
   }
   return null;
+}
+
+/**
+ * Masks sensitive API keys for secure console logging & UI display
+ */
+export function maskApiKey(apiKey: string): string {
+  if (!apiKey || apiKey.length < 8) return '****';
+  return `${apiKey.slice(0, 4)}...${apiKey.slice(-4)}`;
+}
+
+/**
+ * Client-Side Rate Limiter to prevent API payload abuse
+ */
+const rateLimitTracker = new Map<string, number>();
+
+export function checkRateLimit(clientId: string, limitMs = 500): boolean {
+  const now = Date.now();
+  const lastCall = rateLimitTracker.get(clientId) || 0;
+  if (now - lastCall < limitMs) {
+    return false; // Rate limit exceeded
+  }
+  rateLimitTracker.set(clientId, now);
+  return true; // Allowed
 }
