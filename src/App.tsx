@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo, useCallback, lazy, Suspense } from 'react';
 import type { CountryCode, CountryConfig, FlaggedClause, HumanStatus, MilestoneDate } from './types/legal';
 import { SUPPORTED_COUNTRIES, DEFAULT_JURISDICTION } from './data/jurisdictions';
 import { SAMPLE_CONTRACT_PRESETS } from './data/sampleContracts';
 import { parseDocumentWithDocumentAi, extractMilestoneDates } from './services/documentAiService';
 import { downloadExecutiveAuditReport } from './services/workspaceService';
 
-// UI Components
+// Synchronous Eager UI Components
 import { DisclaimerBanner } from './components/DisclaimerBanner';
 import { Header } from './components/Header';
 import { AutoJurisdictionBanner } from './components/AutoJurisdictionBanner';
@@ -14,13 +14,37 @@ import { DocumentParser } from './components/DocumentParser';
 import { DashboardOverview } from './components/DashboardOverview';
 import { TabNavigation, type ActiveTab } from './components/TabNavigation';
 import { ClauseAuditView } from './components/ClauseAuditView';
-import { ContractComparisonView } from './components/ContractComparisonView';
-import { GroundedChatView } from './components/GroundedChatView';
-import { MilestonesChecklistView } from './components/MilestonesChecklistView';
-import { AttorneyBriefView } from './components/AttorneyBriefView';
 import { StatutoryGuardrailModal } from './components/StatutoryGuardrailModal';
 import { RevisionModal } from './components/RevisionModal';
 import { ApiKeyModal } from './components/ApiKeyModal';
+
+// Code Splitting / Lazy Loading for Heavy Views
+const ContractComparisonView = lazy(() =>
+  import('./components/ContractComparisonView').then((m) => ({ default: m.ContractComparisonView }))
+);
+const GroundedChatView = lazy(() =>
+  import('./components/GroundedChatView').then((m) => ({ default: m.GroundedChatView }))
+);
+const MilestonesChecklistView = lazy(() =>
+  import('./components/MilestonesChecklistView').then((m) => ({ default: m.MilestonesChecklistView }))
+);
+const AttorneyBriefView = lazy(() =>
+  import('./components/AttorneyBriefView').then((m) => ({ default: m.AttorneyBriefView }))
+);
+
+/**
+ * Tab Fallback Skeleton Loader
+ */
+function TabLoadingFallback() {
+  return (
+    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-12 text-center flex flex-col items-center justify-center space-y-3 min-h-[350px]">
+      <div className="w-8 h-8 border-3 border-sky-400 border-t-transparent rounded-full animate-spin" />
+      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+        Loading Compliance View...
+      </p>
+    </div>
+  );
+}
 
 export default function App() {
   // Jurisdiction Engine State
@@ -47,51 +71,62 @@ export default function App() {
   const [selectedRevisionClause, setSelectedRevisionClause] = useState<FlaggedClause | null>(null);
 
   // ==========================================
-  // COMPLIANCE METRICS ENGINE
+  // COMPLIANCE METRICS ENGINE (MEMOIZED)
   // ==========================================
-  const totalClauses = clauses.length;
-  const criticalCount = clauses.filter((c) => c.riskLevel === 'critical' && !c.isRemediated).length;
-  const highCount = clauses.filter((c) => c.riskLevel === 'high' && !c.isRemediated).length;
+  const { criticalCount, highCount, beforeScore, afterScore } = useMemo(() => {
+    const total = clauses.length;
+    const critical = clauses.filter((c) => c.riskLevel === 'critical' && !c.isRemediated).length;
+    const high = clauses.filter((c) => c.riskLevel === 'high' && !c.isRemediated).length;
 
-  const rawSumRisk = clauses.reduce((acc, curr) => acc + curr.riskScore, 0);
-  const beforeScore = totalClauses > 0 ? Math.max(10, Math.round(100 - rawSumRisk / totalClauses)) : 100;
+    const rawSumRisk = clauses.reduce((acc, curr) => acc + curr.riskScore, 0);
+    const before = total > 0 ? Math.max(10, Math.round(100 - rawSumRisk / total)) : 100;
 
-  const remediatedSumRisk = clauses.reduce((acc, curr) => acc + (curr.isRemediated ? 5 : curr.riskScore), 0);
-  const afterScore = totalClauses > 0 ? Math.max(15, Math.round(100 - remediatedSumRisk / totalClauses)) : 100;
+    const remediatedSumRisk = clauses.reduce((acc, curr) => acc + (curr.isRemediated ? 5 : curr.riskScore), 0);
+    const after = total > 0 ? Math.max(15, Math.round(100 - remediatedSumRisk / total)) : 100;
+
+    return {
+      criticalCount: critical,
+      highCount: high,
+      beforeScore: before,
+      afterScore: after,
+    };
+  }, [clauses]);
 
   // ==========================================
-  // HANDLERS
+  // MEMOIZED HANDLERS
   // ==========================================
 
   // Document AI OCR & Text Parse Handler
-  const handleParseDocumentText = async (text: string, title: string) => {
-    setIsAuditing(true);
-    setContractFileName(title.toUpperCase());
+  const handleParseDocumentText = useCallback(
+    async (text: string, title: string) => {
+      setIsAuditing(true);
+      setContractFileName(title.toUpperCase());
 
-    try {
-      const result = await parseDocumentWithDocumentAi(text, title, activeCountry.code);
+      try {
+        const result = await parseDocumentWithDocumentAi(text, title, activeCountry.code);
 
-      setClauses(result.extractedClauses);
-      setMilestones(result.extractedMilestones);
-      if (result.extractedClauses[0]) {
-        setActiveClauseId(result.extractedClauses[0].id);
+        setClauses(result.extractedClauses);
+        setMilestones(result.extractedMilestones);
+        if (result.extractedClauses[0]) {
+          setActiveClauseId(result.extractedClauses[0].id);
+        }
+
+        if (result.detectedJurisdiction && result.detectedJurisdiction !== activeCountry.code) {
+          setDetectedCountryCode(result.detectedJurisdiction);
+        } else {
+          setDetectedCountryCode(null);
+        }
+      } catch (err) {
+        console.error('Error parsing document:', err);
+      } finally {
+        setIsAuditing(false);
       }
-
-      // If document AI detects a governing law clause, prompt user
-      if (result.detectedJurisdiction && result.detectedJurisdiction !== activeCountry.code) {
-        setDetectedCountryCode(result.detectedJurisdiction);
-      } else {
-        setDetectedCountryCode(null);
-      }
-    } catch (err) {
-      console.error('Error parsing document:', err);
-    } finally {
-      setIsAuditing(false);
-    }
-  };
+    },
+    [activeCountry.code]
+  );
 
   // Preset Load Handler
-  const handleLoadPreset = (presetId: string) => {
+  const handleLoadPreset = useCallback((presetId: string) => {
     const preset = SAMPLE_CONTRACT_PRESETS.find((p) => p.id === presetId) || SAMPLE_CONTRACT_PRESETS[0];
     setIsAuditing(true);
     setContractFileName(preset.name);
@@ -103,20 +138,20 @@ export default function App() {
       setActiveClauseId(preset.clauses[0].id);
       setDetectedCountryCode(null);
       setIsAuditing(false);
-    }, 300);
-  };
+    }, 250);
+  }, []);
 
   // Switch Active Country
-  const handleSwitchJurisdiction = (code: CountryCode) => {
+  const handleSwitchJurisdiction = useCallback((code: CountryCode) => {
     const country = SUPPORTED_COUNTRIES[code];
     if (country) {
       setActiveCountry(country);
       setClauses((prev) => prev.map((c) => ({ ...c, jurisdictionCode: code })));
     }
-  };
+  }, []);
 
   // Human Review Actions
-  const handleReviewAction = (id: string, status: HumanStatus, notes: string) => {
+  const handleReviewAction = useCallback((id: string, status: HumanStatus, notes: string) => {
     setClauses((prev) =>
       prev.map((c) =>
         c.id === id
@@ -128,9 +163,9 @@ export default function App() {
           : c
       )
     );
-  };
+  }, []);
 
-  const handleToggleRemediated = (id: string) => {
+  const handleToggleRemediated = useCallback((id: string) => {
     setClauses((prev) =>
       prev.map((c) =>
         c.id === id
@@ -142,7 +177,7 @@ export default function App() {
           : c
       )
     );
-  };
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 md:p-6 selection:bg-sky-500 selection:text-slate-950">
@@ -182,7 +217,6 @@ export default function App() {
           currentFileName={contractFileName}
         />
 
-
         {/* SIDEBAR + WORKSPACE LAYOUT */}
         <div className="flex gap-6 items-start">
           {/* VERTICAL TAB SIDEBAR */}
@@ -192,7 +226,7 @@ export default function App() {
             unresolvedCount={criticalCount + highCount}
           />
 
-          {/* TAB WORKSPACE CONTENT */}
+          {/* TAB WORKSPACE CONTENT WITH LAZY SUSPENSE */}
           <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 outline-none">
             {activeTab === 'dashboard' && (
               <DashboardOverview
@@ -220,42 +254,44 @@ export default function App() {
               />
             )}
 
-            {activeTab === 'compare' && (
-              <ContractComparisonView
-                currentClauses={clauses}
-                currentFileName={contractFileName}
-                activeCountry={activeCountry}
-              />
-            )}
+            <Suspense fallback={<TabLoadingFallback />}>
+              {activeTab === 'compare' && (
+                <ContractComparisonView
+                  currentClauses={clauses}
+                  currentFileName={contractFileName}
+                  activeCountry={activeCountry}
+                />
+              )}
 
-            {activeTab === 'chat' && (
-              <GroundedChatView
-                clauses={clauses}
-                activeClause={clauses.find((c) => c.id === activeClauseId)}
-                activeCountry={activeCountry}
-                contractFileName={contractFileName}
-                apiKey={geminiApiKey}
-              />
-            )}
+              {activeTab === 'chat' && (
+                <GroundedChatView
+                  clauses={clauses}
+                  activeClause={clauses.find((c) => c.id === activeClauseId)}
+                  activeCountry={activeCountry}
+                  contractFileName={contractFileName}
+                  apiKey={geminiApiKey}
+                />
+              )}
 
-            {activeTab === 'milestones' && (
-              <MilestonesChecklistView
-                milestones={milestones}
-                clauses={clauses}
-                activeCountry={activeCountry}
-                contractFileName={contractFileName}
-                beforeScore={beforeScore}
-                afterScore={afterScore}
-              />
-            )}
+              {activeTab === 'milestones' && (
+                <MilestonesChecklistView
+                  milestones={milestones}
+                  clauses={clauses}
+                  activeCountry={activeCountry}
+                  contractFileName={contractFileName}
+                  beforeScore={beforeScore}
+                  afterScore={afterScore}
+                />
+              )}
 
-            {activeTab === 'attorney' && (
-              <AttorneyBriefView
-                clauses={clauses}
-                activeCountry={activeCountry}
-                contractFileName={contractFileName}
-              />
-            )}
+              {activeTab === 'attorney' && (
+                <AttorneyBriefView
+                  clauses={clauses}
+                  activeCountry={activeCountry}
+                  contractFileName={contractFileName}
+                />
+              )}
+            </Suspense>
           </main>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { FlaggedClause, CountryConfig, HumanStatus, ComplianceCategory, RiskLevel } from '../types/legal';
 import { AlertTriangle, ShieldCheck, Copy, Sparkles, Filter, Info, HelpCircle, ArrowRight } from 'lucide-react';
 
@@ -13,7 +13,7 @@ interface Props {
   onOpenRevisionModal: (clause: FlaggedClause) => void;
 }
 
-export const ClauseAuditView: React.FC<Props> = ({
+export const ClauseAuditView: React.FC<Props> = React.memo(({
   clauses,
   activeClauseId,
   onSelectClause,
@@ -30,13 +30,21 @@ export const ClauseAuditView: React.FC<Props> = ({
   const [activeNegotiationTab, setActiveNegotiationTab] = useState<'balanced' | 'aggressive' | 'conservative'>('balanced');
   const [copiedRevision, setCopiedRevision] = useState<boolean>(false);
 
-  const activeClause = clauses.find((c) => c.id === activeClauseId) || clauses[0];
+  const activeClause = useMemo(
+    () => clauses.find((c) => c.id === activeClauseId) || clauses[0],
+    [clauses, activeClauseId]
+  );
 
-  const filteredClauses = clauses.filter((c) => {
-    const matchesCategory = selectedCategory === 'ALL' || c.primaryCategory === selectedCategory || c.relatedCategories.includes(selectedCategory);
-    const matchesRisk = selectedRisk === 'ALL' || c.riskLevel === selectedRisk;
-    return matchesCategory && matchesRisk;
-  });
+  const filteredClauses = useMemo(() => {
+    return clauses.filter((c) => {
+      const matchesCategory =
+        selectedCategory === 'ALL' ||
+        c.primaryCategory === selectedCategory ||
+        c.relatedCategories.includes(selectedCategory);
+      const matchesRisk = selectedRisk === 'ALL' || c.riskLevel === selectedRisk;
+      return matchesCategory && matchesRisk;
+    });
+  }, [clauses, selectedCategory, selectedRisk]);
 
   const handleCopyRevision = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -407,4 +415,6 @@ export const ClauseAuditView: React.FC<Props> = ({
       </div>
     </div>
   );
-};
+});
+
+ClauseAuditView.displayName = 'ClauseAuditView';

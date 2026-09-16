@@ -1,6 +1,7 @@
 import type { FlaggedClause, CountryCode, MilestoneDate } from '../types/legal';
 import { detectJurisdictionFromText, DEFAULT_JURISDICTION } from '../data/jurisdictions';
 import { analyzeClauseWithGemini } from './geminiService';
+import { analysisCache } from './analysisCache';
 
 export interface DocumentAiParseResult {
   fileName: string;
@@ -15,7 +16,7 @@ export interface DocumentAiParseResult {
 }
 
 /**
- * Google Cloud Document AI & OCR Handler
+ * Google Cloud Document AI & OCR Handler with LRU Cache for peak performance
  */
 export async function parseDocumentWithDocumentAi(
   fileContent: string,
@@ -24,6 +25,12 @@ export async function parseDocumentWithDocumentAi(
 ): Promise<DocumentAiParseResult> {
   const detectedJurisdiction = detectJurisdictionFromText(fileContent);
   const activeJurisdiction = detectedJurisdiction || userJurisdiction || DEFAULT_JURISDICTION;
+
+  // Check LRU cache for 0ms cached result
+  const cached = analysisCache.get<DocumentAiParseResult>(fileContent, activeJurisdiction);
+  if (cached) {
+    return { ...cached, fileName };
+  }
 
   let extractedClauses: FlaggedClause[] = [];
 
@@ -89,7 +96,7 @@ export async function parseDocumentWithDocumentAi(
   // Extract Milestone Dates
   const extractedMilestones = extractMilestoneDates(fileContent);
 
-  return {
+  const result: DocumentAiParseResult = {
     fileName,
     fileType: fileName.endsWith('.json') ? 'JSON Audit Report' : fileName.endsWith('.pdf') ? 'PDF Document (OCR)' : 'Text/Markdown Document',
     rawText: fileContent,
@@ -100,6 +107,9 @@ export async function parseDocumentWithDocumentAi(
     totalPageCount: Math.max(1, Math.ceil(fileContent.length / 2500)),
     ocrConfidence: 0.96
   };
+
+  analysisCache.set(fileContent, activeJurisdiction, result);
+  return result;
 }
 
 /**

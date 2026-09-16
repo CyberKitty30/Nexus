@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { FlaggedClause, CountryConfig } from '../types/legal';
 import { AlertOctagon, ShieldCheck, CheckCircle2, TrendingUp, Sparkles } from 'lucide-react';
 
@@ -10,26 +10,39 @@ interface Props {
   afterScore: number;
 }
 
-export const DashboardOverview: React.FC<Props> = ({
+export const DashboardOverview: React.FC<Props> = React.memo(({
   clauses,
   activeCountry,
   onSelectClause,
   beforeScore,
   afterScore,
 }) => {
-  const total = clauses.length;
-  const critical = clauses.filter((c) => c.riskLevel === 'critical' && !c.isRemediated).length;
-  const high = clauses.filter((c) => c.riskLevel === 'high' && !c.isRemediated).length;
-  const medium = clauses.filter((c) => c.riskLevel === 'medium' && !c.isRemediated).length;
-  const lowOrFixed = clauses.filter((c) => c.riskLevel === 'low' || c.isRemediated).length;
+  const { total, critical, high, medium, lowOrFixed, reviewedCount, remediatedCount, topPriorityIssues } = useMemo(() => {
+    const tot = clauses.length;
+    const crit = clauses.filter((c) => c.riskLevel === 'critical' && !c.isRemediated).length;
+    const h = clauses.filter((c) => c.riskLevel === 'high' && !c.isRemediated).length;
+    const m = clauses.filter((c) => c.riskLevel === 'medium' && !c.isRemediated).length;
+    const lOrFixed = clauses.filter((c) => c.riskLevel === 'low' || c.isRemediated).length;
 
-  const reviewedCount = clauses.filter((c) => c.humanStatus !== 'pending').length;
-  const remediatedCount = clauses.filter((c) => c.isRemediated).length;
+    const rev = clauses.filter((c) => c.humanStatus !== 'pending').length;
+    const rem = clauses.filter((c) => c.isRemediated).length;
 
-  const topPriorityIssues = [...clauses]
-    .filter((c) => !c.isRemediated)
-    .sort((a, b) => b.riskScore - a.riskScore)
-    .slice(0, 4);
+    const topIssues = [...clauses]
+      .filter((c) => !c.isRemediated)
+      .sort((a, b) => b.riskScore - a.riskScore)
+      .slice(0, 4);
+
+    return {
+      total: tot,
+      critical: crit,
+      high: h,
+      medium: m,
+      lowOrFixed: lOrFixed,
+      reviewedCount: rev,
+      remediatedCount: rem,
+      topPriorityIssues: topIssues,
+    };
+  }, [clauses]);
 
   return (
     <div className="space-y-4 mb-6">
@@ -171,4 +184,6 @@ export const DashboardOverview: React.FC<Props> = ({
       </div>
     </div>
   );
-};
+});
+
+DashboardOverview.displayName = 'DashboardOverview';
