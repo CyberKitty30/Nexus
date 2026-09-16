@@ -1,0 +1,304 @@
+/* Google Fonts — Premium Typography (must be first) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+/* ============================================================
+   NEXUS AI — Global Design System & Premium Micro-Animations
+   ============================================================ */
+
+
+/* Root custom properties */
+:root {
+  --nexus-primary: #a855f7;
+  --nexus-accent: #ec4899;
+  --nexus-success: #10b981;
+  --nexus-danger: #f43f5e;
+  --nexus-bg: #0A0712;
+  --nexus-surface: #130b24;
+  --nexus-border: rgba(168, 85, 247, 0.25);
+  --nexus-glow: 0 0 25px rgba(168, 85, 247, 0.35);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* Base Body with Deep Obsidian Midnight (#0A0712) and Frosted Violet Radial Gradient */
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: #0A0712;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(168, 85, 247, 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(236, 72, 153, 0.12) 0px, transparent 50%),
+    radial-gradient(at 50% 100%, rgba(99, 102, 241, 0.1) 0px, transparent 50%);
+  background-attachment: fixed;
+  color: #f3e8ff;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Frosted Violet Glassmorphism Bento Panel */
+.bento-panel {
+  background: rgba(19, 11, 36, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  box-shadow: 0 8px 32px 0 rgba(15, 3, 25, 0.7);
+  border-radius: 1rem;
+}
+
+/* Luxury Neon Accents & Severity Glows */
+.glow-purple {
+  box-shadow: 0 0 25px -5px rgba(168, 85, 247, 0.4), 0 0 10px -2px rgba(168, 85, 247, 0.2);
+  border-color: rgba(168, 85, 247, 0.5);
+}
+
+.glow-pink {
+  box-shadow: 0 0 25px -5px rgba(236, 72, 153, 0.4), 0 0 10px -2px rgba(236, 72, 153, 0.2);
+  border-color: rgba(236, 72, 153, 0.5);
+}
+
+.glow-indigo {
+  box-shadow: 0 0 25px -5px rgba(99, 102, 241, 0.4), 0 0 10px -2px rgba(99, 102, 241, 0.2);
+  border-color: rgba(99, 102, 241, 0.5);
+}
+
+.glow-emerald {
+  box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.4), 0 0 10px -2px rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.5);
+}
+
+.glow-cyan {
+  box-shadow: 0 0 25px -5px rgba(6, 182, 212, 0.4), 0 0 10px -2px rgba(6, 182, 212, 0.2);
+  border-color: rgba(6, 182, 212, 0.5);
+}
+
+/* Monospace elements */
+code, pre, .font-mono {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
+}
+
+/* ============================================================
+   SCROLLBAR POLISH
+   ============================================================ */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* ============================================================
+   PREMIUM MICRO-ANIMATIONS
+   ============================================================ */
+
+/* Fade-in slide up entrance */
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Shimmer loading pulse */
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+/* Gentle pulse glow */
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(14, 165, 233, 0.15); }
+  50% { box-shadow: 0 0 24px rgba(14, 165, 233, 0.45); }
+}
+
+/* Score counter animation */
+@keyframes scoreReveal {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Slide in from right for modal */
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Risk badge pulse for critical items */
+@keyframes criticalPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Chat bubble entrance */
+@keyframes chatBubble {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ============================================================
+   UTILITY ANIMATION CLASSES
+   ============================================================ */
+.animate-fade-slide-up {
+  animation: fadeSlideUp 0.35s ease-out both;
+}
+
+.animate-score-reveal {
+  animation: scoreReveal 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.3s ease-out both;
+}
+
+.animate-chat-bubble {
+  animation: chatBubble 0.25s ease-out both;
+}
+
+.animate-glow-pulse {
+  animation: glowPulse 2s ease-in-out infinite;
+}
+
+/* Critical risk items pulse red */
+.risk-critical-pulse {
+  animation: criticalPulse 2s ease-in-out infinite;
+}
+
+/* ============================================================
+   GLASSMORPHISM CARDS
+   ============================================================ */
+.glass-card {
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(51, 65, 85, 0.6);
+}
+
+.glass-card-sky {
+  background: rgba(8, 47, 73, 0.4);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(14, 165, 233, 0.2);
+}
+
+/* ============================================================
+   GRADIENT TEXT UTILITIES
+   ============================================================ */
+.gradient-text-nexus {
+  background: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #34d399 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gradient-text-amber {
+  background: linear-gradient(135deg, #fbbf24 0%, #f97316 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ============================================================
+   INTERACTIVE ELEMENT ENHANCEMENTS
+   ============================================================ */
+
+/* Buttons */
+button {
+  transition: all 0.15s ease;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Input focus glow */
+input:focus,
+textarea:focus,
+select:focus {
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.25);
+}
+
+/* Clause card hover lift */
+.clause-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.clause-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* ============================================================
+   PROGRESS BAR ANIMATION
+   ============================================================ */
+.progress-bar-fill {
+  transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ============================================================
+   MODAL BACKDROP
+   ============================================================ */
+.modal-backdrop {
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: fadeSlideUp 0.2s ease-out both;
+}
+
+/* ============================================================
+   RISK LEVEL COLOR TOKENS
+   ============================================================ */
+.risk-critical { color: #f87171; }
+.risk-high { color: #fbbf24; }
+.risk-medium { color: #60a5fa; }
+.risk-low { color: #34d399; }
+
+/* ============================================================
+   TOOLTIP ENHANCEMENT
+   ============================================================ */
+.tooltip-content {
+  animation: fadeSlideUp 0.15s ease-out both;
+  pointer-events: none;
+}
+
+/* ============================================================
+   STAGGERED LIST ENTRANCE (for clause queue)
+   ============================================================ */
+.stagger-enter > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-enter > *:nth-child(2) { animation-delay: 50ms; }
+.stagger-enter > *:nth-child(3) { animation-delay: 100ms; }
+.stagger-enter > *:nth-child(4) { animation-delay: 150ms; }
+.stagger-enter > *:nth-child(5) { animation-delay: 200ms; }
+.stagger-enter > * { animation: fadeSlideUp 0.3s ease-out both; }
+
+/* ============================================================
+   NEXUS AI LOGO GRADIENT ANIMATION
+   ============================================================ */
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.nexus-logo-gradient {
+  background: linear-gradient(-45deg, #38bdf8, #6366f1, #34d399, #f59e0b);
+  background-size: 400% 400%;
+  animation: gradientShift 5s ease infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ============================================================
+   PRINT STYLES
+   ============================================================ */
+@media print {
+  body { background: white; color: black; }
+  .no-print { display: none !important; }
+}
