@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { FlaggedClause, CountryConfig } from '../types/legal';
 import { askNexusAssistant } from '../services/geminiService';
+import { sanitizeInput } from '../middleware/security';
 import { Send, Sparkles, BookOpen, Bot, User } from 'lucide-react';
 
 interface Props {
@@ -39,9 +40,12 @@ export const GroundedChatView: React.FC<Props> = ({
   const handleSendMessage = async (queryText: string) => {
     if (!queryText.trim()) return;
 
+    const { sanitizedText } = sanitizeInput(queryText);
+    if (!sanitizedText.trim()) return;
+
     const userMsg: ChatMessage = {
       sender: 'user',
-      text: queryText,
+      text: sanitizedText,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
@@ -52,7 +56,7 @@ export const GroundedChatView: React.FC<Props> = ({
     const contractContext = clauses.map((c) => `${c.section}: ${c.clauseText}`).join('\n');
 
     try {
-      const response = await askNexusAssistant(queryText, contractContext, activeCountry.code, activeClause, apiKey);
+      const response = await askNexusAssistant(sanitizedText, contractContext, activeCountry.code, activeClause, apiKey);
       const nexusMsg: ChatMessage = {
         sender: 'nexus',
         text: response.text,

@@ -1,5 +1,6 @@
 import React, { useState, type ChangeEvent } from 'react';
 import { SAMPLE_CONTRACT_PRESETS } from '../data/sampleContracts';
+import { sanitizeInput } from '../middleware/security';
 import { FileUp, Cpu, CheckCircle2, Sparkles } from 'lucide-react';
 
 interface Props {
@@ -26,7 +27,8 @@ export const DocumentParser: React.FC<Props> = ({
     reader.onload = (evt) => {
       const content = evt.target?.result as string;
       if (content) {
-        onParseText(content, file.name);
+        const { sanitizedText } = sanitizeInput(content);
+        onParseText(sanitizedText, file.name);
       }
     };
     reader.readAsText(file);
@@ -41,7 +43,8 @@ export const DocumentParser: React.FC<Props> = ({
       reader.onload = (evt) => {
         const content = evt.target?.result as string;
         if (content) {
-          onParseText(content, file.name);
+          const { sanitizedText } = sanitizeInput(content);
+          onParseText(sanitizedText, file.name);
         }
       };
       reader.readAsText(file);
@@ -129,7 +132,8 @@ export const DocumentParser: React.FC<Props> = ({
           <button
             onClick={() => {
               if (rawText.trim()) {
-                onParseText(rawText, 'Custom Uploaded Legal Snippet');
+                const { sanitizedText } = sanitizeInput(rawText);
+                onParseText(sanitizedText, 'Custom Uploaded Legal Snippet');
                 setRawText('');
               }
             }}
