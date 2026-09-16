@@ -10,7 +10,7 @@ interface Props {
   onDismiss: () => void;
 }
 
-export const AutoJurisdictionBanner: React.FC<Props> = ({
+export const AutoJurisdictionBanner: React.FC<Props> = React.memo(({
   detectedCode,
   activeCode,
   onSwitchJurisdiction,
@@ -60,4 +60,6 @@ export const AutoJurisdictionBanner: React.FC<Props> = ({
       </div>
     </div>
   );
-};
+});
+
+AutoJurisdictionBanner.displayName = 'AutoJurisdictionBanner';

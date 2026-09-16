@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import type { FlaggedClause, CountryConfig } from '../types/legal';
 import { Copy, Check, X, Sparkles, Wand2 } from 'lucide-react';
 
@@ -10,7 +10,7 @@ interface Props {
   onApplyRevision: (id: string) => void;
 }
 
-export const RevisionModal: React.FC<Props> = ({
+export const RevisionModal: React.FC<Props> = React.memo(({
   isOpen,
   onClose,
   clause,
@@ -19,13 +19,22 @@ export const RevisionModal: React.FC<Props> = ({
 }) => {
   const [copied, setCopied] = useState<boolean>(false);
 
-  if (!isOpen || !clause) return null;
+  const handleCopy = useCallback(() => {
+    if (clause) {
+      navigator.clipboard.writeText(clause.suggestedRevision);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }, [clause]);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(clause.suggestedRevision);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  const handleApply = useCallback(() => {
+    if (clause) {
+      onApplyRevision(clause.id);
+      onClose();
+    }
+  }, [clause, onApplyRevision, onClose]);
+
+  if (!isOpen || !clause) return null;
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -75,10 +84,7 @@ export const RevisionModal: React.FC<Props> = ({
             <span>{copied ? 'Copied to Clipboard!' : 'Copy Revised Clause'}</span>
           </button>
           <button
-            onClick={() => {
-              onApplyRevision(clause.id);
-              onClose();
-            }}
+            onClick={handleApply}
             className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg transition-all flex items-center gap-1.5 cursor-pointer"
           >
             <Check className="w-4 h-4 stroke-[3]" />
@@ -88,4 +94,6 @@ export const RevisionModal: React.FC<Props> = ({
       </div>
     </div>
   );
-};
+});
+
+RevisionModal.displayName = 'RevisionModal';

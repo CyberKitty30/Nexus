@@ -10,7 +10,7 @@ interface Props {
   hasApiKey: boolean;
 }
 
-export const Header: React.FC<Props> = ({
+export const Header: React.FC<Props> = React.memo(({
   activeCountry,
   onOpenJurisdictionModal,
   onOpenApiKeyModal,
@@ -76,4 +76,6 @@ export const Header: React.FC<Props> = ({
       </div>
     </header>
   );
-};
+});
+
+Header.displayName = 'Header';

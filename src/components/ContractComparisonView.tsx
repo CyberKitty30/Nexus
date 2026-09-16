@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { FlaggedClause, CountryConfig, ContractComparisonItem } from '../types/legal';
 import { SAMPLE_CONTRACT_PRESETS } from '../data/sampleContracts';
 import { GitCompare, ArrowRightLeft, ShieldAlert, ShieldCheck, FileCheck } from 'lucide-react';
@@ -9,40 +9,47 @@ interface Props {
   activeCountry: CountryConfig;
 }
 
-export const ContractComparisonView: React.FC<Props> = ({
+export const ContractComparisonView: React.FC<Props> = React.memo(({
   currentClauses,
   currentFileName,
   activeCountry,
 }) => {
   const [selectedBaselineId, setSelectedBaselineId] = useState<string>(SAMPLE_CONTRACT_PRESETS[1].id);
 
-  const baselinePreset = SAMPLE_CONTRACT_PRESETS.find((p) => p.id === selectedBaselineId) || SAMPLE_CONTRACT_PRESETS[1];
+  const baselinePreset = useMemo(
+    () => SAMPLE_CONTRACT_PRESETS.find((p) => p.id === selectedBaselineId) ?? SAMPLE_CONTRACT_PRESETS[1],
+    [selectedBaselineId]
+  );
 
-  const comparisonItems: ContractComparisonItem[] = currentClauses.map((clause, idx) => {
-    const baselineClause = baselinePreset.clauses[idx] || baselinePreset.clauses[0];
+  const { comparisonItems, saferCount, riskierCount } = useMemo(() => {
+    const items: ContractComparisonItem[] = currentClauses.map((clause, idx) => {
+      const baselineClause = baselinePreset.clauses[idx] ?? baselinePreset.clauses[0];
 
-    const isDifferent = clause.clauseText.trim() !== baselineClause.clauseText.trim();
-    const riskShift =
-      clause.riskScore < baselineClause.riskScore
-        ? 'safer'
-        : clause.riskScore > baselineClause.riskScore
-        ? 'riskier'
-        : 'neutral';
+      const isDifferent = clause.clauseText.trim() !== baselineClause.clauseText.trim();
+      const riskShift =
+        clause.riskScore < baselineClause.riskScore
+          ? 'safer'
+          : clause.riskScore > baselineClause.riskScore
+          ? 'riskier'
+          : 'neutral';
 
-    return {
-      sectionTitle: clause.section,
-      docAClause: clause.clauseText,
-      docBClause: baselineClause.clauseText,
-      diffType: isDifferent ? 'modified' : 'identical',
-      riskShift,
-      explanation: isDifferent
-        ? `Document A evaluates to risk score ${clause.riskScore}/100 vs Baseline (${baselineClause.riskScore}/100). Difference primarily in ${clause.primaryCategory}.`
-        : 'Clause wording aligns with standard benchmark template.',
-    };
-  });
+      return {
+        sectionTitle: clause.section,
+        docAClause: clause.clauseText,
+        docBClause: baselineClause.clauseText,
+        diffType: isDifferent ? 'modified' : 'identical',
+        riskShift,
+        explanation: isDifferent
+          ? `Document A evaluates to risk score ${clause.riskScore}/100 vs Baseline (${baselineClause.riskScore}/100). Difference primarily in ${clause.primaryCategory}.`
+          : 'Clause wording aligns with standard benchmark template.',
+      };
+    });
 
-  const saferCount = comparisonItems.filter((i) => i.riskShift === 'safer').length;
-  const riskierCount = comparisonItems.filter((i) => i.riskShift === 'riskier').length;
+    const safer = items.filter((i) => i.riskShift === 'safer').length;
+    const riskier = items.filter((i) => i.riskShift === 'riskier').length;
+
+    return { comparisonItems: items, saferCount: safer, riskierCount: riskier };
+  }, [currentClauses, baselinePreset]);
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-6">
@@ -152,4 +159,6 @@ export const ContractComparisonView: React.FC<Props> = ({
       </div>
     </div>
   );
-};
+});
+
+ContractComparisonView.displayName = 'ContractComparisonView';

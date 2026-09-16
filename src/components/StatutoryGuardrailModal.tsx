@@ -9,7 +9,7 @@ interface Props {
   country: CountryConfig;
 }
 
-export const StatutoryGuardrailModal: React.FC<Props> = ({
+export const StatutoryGuardrailModal: React.FC<Props> = React.memo(({
   isOpen,
   onClose,
   clause,
@@ -74,4 +74,6 @@ export const StatutoryGuardrailModal: React.FC<Props> = ({
       </div>
     </div>
   );
-};
+});
+
+StatutoryGuardrailModal.displayName = 'StatutoryGuardrailModal';

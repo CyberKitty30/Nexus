@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import type { FlaggedClause, CountryConfig } from '../types/legal';
 import { askNexusAssistant } from '../services/geminiService';
 import { sanitizeInput } from '../middleware/security';
@@ -19,7 +19,7 @@ interface ChatMessage {
   timestamp: string;
 }
 
-export const GroundedChatView: React.FC<Props> = ({
+export const GroundedChatView: React.FC<Props> = React.memo(({
   clauses,
   activeClause,
   activeCountry,
@@ -37,7 +37,7 @@ export const GroundedChatView: React.FC<Props> = ({
   ]);
   const [isThinking, setIsThinking] = useState<boolean>(false);
 
-  const handleSendMessage = async (queryText: string) => {
+  const handleSendMessage = useCallback(async (queryText: string) => {
     if (!queryText.trim()) return;
 
     const { sanitizedText } = sanitizeInput(queryText);
@@ -69,15 +69,15 @@ export const GroundedChatView: React.FC<Props> = ({
     } finally {
       setIsThinking(false);
     }
-  };
+  }, [clauses, activeClause, activeCountry.code, apiKey]);
 
-  const presetQuestions = [
+  const presetQuestions = useMemo(() => [
     'Why was this clause flagged?',
     'Show me a safer alternative revision.',
     `Is the non-compete clause legal under ${activeCountry.name} law?`,
     'What are my termination and renewal notice obligations?',
     'What privacy obligations apply under data statutes?',
-  ];
+  ], [activeCountry.name]);
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col h-[680px]">
@@ -183,4 +183,6 @@ export const GroundedChatView: React.FC<Props> = ({
       </div>
     </div>
   );
-};
+});
+
+GroundedChatView.displayName = 'GroundedChatView';

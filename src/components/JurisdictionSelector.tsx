@@ -10,7 +10,7 @@ interface Props {
   onSelectCountry: (code: CountryCode) => void;
 }
 
-export const JurisdictionSelector: React.FC<Props> = ({
+export const JurisdictionSelector: React.FC<Props> = React.memo(({
   isOpen,
   onClose,
   activeCountry,
@@ -102,4 +102,6 @@ export const JurisdictionSelector: React.FC<Props> = ({
       </div>
     </div>
   );
-};
+});
+
+JurisdictionSelector.displayName = 'JurisdictionSelector';

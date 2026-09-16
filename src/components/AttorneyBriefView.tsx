@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import type { FlaggedClause, CountryConfig, AttorneyBrief } from '../types/legal';
 import { exportToGoogleDocs } from '../services/workspaceService';
 import { FileText, FileUp, Sparkles, ShieldCheck } from 'lucide-react';
@@ -9,14 +9,12 @@ interface Props {
   contractFileName: string;
 }
 
-export const AttorneyBriefView: React.FC<Props> = ({
+export const AttorneyBriefView: React.FC<Props> = React.memo(({
   clauses,
   activeCountry,
   contractFileName,
 }) => {
-  const [brief, setBrief] = useState<AttorneyBrief | null>(() => generateAttorneyBrief());
-
-  function generateAttorneyBrief(): AttorneyBrief {
+  const buildAttorneyBrief = useCallback((): AttorneyBrief => {
     const criticals = clauses.filter((c) => c.riskLevel === 'critical' && !c.isRemediated);
     const highs = clauses.filter((c) => c.riskLevel === 'high' && !c.isRemediated);
 
@@ -46,9 +44,12 @@ export const AttorneyBriefView: React.FC<Props> = ({
       recommendedPositioning: `Insist on deleting void non-compete restraints, inserting UCTA/UCC carve-outs for negligence, uncapping liability for data privacy breaches, and adding a 30-day cure period for default notices.`,
       targetedAdvocateQuestions: targetedQuestions,
     };
-  }
+  }, [clauses, activeCountry, contractFileName]);
 
-  const handleExportDocs = () => {
+  const initialBrief = useMemo(() => buildAttorneyBrief(), [buildAttorneyBrief]);
+  const [brief, setBrief] = useState<AttorneyBrief | null>(initialBrief);
+
+  const handleExportDocs = useCallback(() => {
     if (!brief) return;
 
     const htmlContent = `
@@ -83,7 +84,11 @@ export const AttorneyBriefView: React.FC<Props> = ({
 `;
 
     exportToGoogleDocs(`Attorney_Brief_${activeCountry.code}_${contractFileName}`, htmlContent);
-  };
+  }, [brief, activeCountry.code, contractFileName]);
+
+  const handleRegenerate = useCallback(() => {
+    setBrief(buildAttorneyBrief());
+  }, [buildAttorneyBrief]);
 
   return (
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-6">
@@ -107,7 +112,7 @@ export const AttorneyBriefView: React.FC<Props> = ({
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setBrief(generateAttorneyBrief())}
+            onClick={handleRegenerate}
             className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition-all cursor-pointer flex items-center gap-1.5"
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
@@ -198,4 +203,6 @@ export const AttorneyBriefView: React.FC<Props> = ({
       )}
     </div>
   );
-};
+});
+
+AttorneyBriefView.displayName = 'AttorneyBriefView';

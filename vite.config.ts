@@ -1,6 +1,11 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type UserConfig } from 'vite';
+import type { InlineConfig } from 'vitest/node';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+
+interface VitestConfigExport extends UserConfig {
+  test?: InlineConfig;
+}
 
 export default defineConfig({
   base: './',
@@ -14,7 +19,7 @@ export default defineConfig({
     },
     rollupOptions: {
       output: {
-        manualChunks(id: string) {
+        manualChunks(id: string): string | undefined {
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
             return 'vendor-react';
           }
@@ -24,6 +29,7 @@ export default defineConfig({
           if (id.includes('node_modules/@google/genai')) {
             return 'vendor-genai';
           }
+          return undefined;
         },
       },
     },
@@ -33,4 +39,4 @@ export default defineConfig({
     globals: true,
     environment: 'happy-dom',
   },
-} as any);
+} as VitestConfigExport);

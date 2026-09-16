@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Key, X, Check } from 'lucide-react';
 
 interface Props {
@@ -8,13 +8,18 @@ interface Props {
   onSaveApiKey: (key: string) => void;
 }
 
-export const ApiKeyModal: React.FC<Props> = ({
+export const ApiKeyModal: React.FC<Props> = React.memo(({
   isOpen,
   onClose,
   apiKey: currentApiKey,
   onSaveApiKey,
 }) => {
   const [inputKey, setInputKey] = useState<string>(currentApiKey);
+
+  const handleSave = useCallback(() => {
+    onSaveApiKey(inputKey);
+    onClose();
+  }, [inputKey, onSaveApiKey, onClose]);
 
   if (!isOpen) return null;
 
@@ -56,10 +61,7 @@ export const ApiKeyModal: React.FC<Props> = ({
             Cancel
           </button>
           <button
-            onClick={() => {
-              onSaveApiKey(inputKey);
-              onClose();
-            }}
+            onClick={handleSave}
             className="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded-lg transition-all flex items-center gap-1.5 cursor-pointer"
           >
             <Check className="w-4 h-4 stroke-[3]" />
@@ -69,4 +71,6 @@ export const ApiKeyModal: React.FC<Props> = ({
       </div>
     </div>
   );
-};
+});
+
+ApiKeyModal.displayName = 'ApiKeyModal';

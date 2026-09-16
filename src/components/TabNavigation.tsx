@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   LayoutDashboard,
   ShieldAlert,
@@ -16,22 +16,14 @@ interface Props {
   unresolvedCount: number;
 }
 
-export const TabNavigation: React.FC<Props> = ({
+export const TabNavigation: React.FC<Props> = React.memo(({
   activeTab,
   onSelectTab,
   unresolvedCount,
 }) => {
-  const tabs: {
-    id: ActiveTab;
-    label: string;
-    subLabel: string;
-    icon: React.FC<{ className?: string; 'aria-hidden'?: boolean }>;
-    badge: string;
-    badgeColor: string;
-    star?: boolean;
-  }[] = [
+  const tabs = useMemo(() => [
     {
-      id: 'dashboard',
+      id: 'dashboard' as const,
       label: '12-Column Bento Grid Dashboard',
       subLabel: 'Overview',
       icon: LayoutDashboard,
@@ -40,7 +32,7 @@ export const TabNavigation: React.FC<Props> = ({
       star: true,
     },
     {
-      id: 'audit',
+      id: 'audit' as const,
       label: 'Clause Risk Audit',
       subLabel: 'Risk Analysis',
       icon: ShieldAlert,
@@ -51,7 +43,7 @@ export const TabNavigation: React.FC<Props> = ({
           : 'bg-emerald-950 text-emerald-400 border-emerald-800',
     },
     {
-      id: 'compare',
+      id: 'compare' as const,
       label: 'Contract Comparison',
       subLabel: 'Side-by-Side Diff',
       icon: GitCompare,
@@ -59,7 +51,7 @@ export const TabNavigation: React.FC<Props> = ({
       badgeColor: 'bg-indigo-950 text-indigo-300 border-indigo-800',
     },
     {
-      id: 'chat',
+      id: 'chat' as const,
       label: 'Ask NEXUS Q&A',
       subLabel: 'Grounded Answers',
       icon: MessageSquare,
@@ -67,7 +59,7 @@ export const TabNavigation: React.FC<Props> = ({
       badgeColor: 'bg-sky-950 text-sky-300 border-sky-800',
     },
     {
-      id: 'milestones',
+      id: 'milestones' as const,
       label: 'Calendar & Milestones',
       subLabel: 'Deadline Tracker',
       icon: CalendarCheck,
@@ -75,14 +67,14 @@ export const TabNavigation: React.FC<Props> = ({
       badgeColor: 'bg-purple-950 text-purple-300 border-purple-800',
     },
     {
-      id: 'attorney',
+      id: 'attorney' as const,
       label: 'Attorney Brief',
       subLabel: 'Export & Review',
       icon: FileText,
       badge: 'Google Docs',
       badgeColor: 'bg-amber-950 text-amber-300 border-amber-800',
     },
-  ];
+  ], [unresolvedCount]);
 
   return (
     <nav
@@ -145,4 +137,6 @@ export const TabNavigation: React.FC<Props> = ({
       </div>
     </nav>
   );
-};
+});
+
+TabNavigation.displayName = 'TabNavigation';

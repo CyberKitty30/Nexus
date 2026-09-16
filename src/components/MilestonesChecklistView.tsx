@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import type { MilestoneDate, ComplianceChecklistItem, CountryConfig, FlaggedClause } from '../types/legal';
 import { syncToGoogleCalendar, downloadExecutiveAuditReport } from '../services/workspaceService';
 import { Calendar, CheckSquare, Download, CalendarPlus, Check, Sparkles, Clock } from 'lucide-react';
@@ -12,7 +12,7 @@ interface Props {
   afterScore: number;
 }
 
-export const MilestonesChecklistView: React.FC<Props> = ({
+export const MilestonesChecklistView: React.FC<Props> = React.memo(({
   milestones: initialMilestones,
   clauses,
   activeCountry,
@@ -34,7 +34,7 @@ export const MilestonesChecklistView: React.FC<Props> = ({
       id: 'chk-2',
       task: `Execute Standard Data Protection Addendum (DPA) and Consent Manager protocol`,
       category: 'GDPR_PRIVACY',
-      statutoryReference: activeCountry.primaryStatutes[1] || 'DPDP Act 2023 / GDPR',
+      statutoryReference: activeCountry.primaryStatutes[1] ?? 'DPDP Act 2023 / GDPR',
       completed: false,
       priority: 'must_have',
     },
@@ -64,13 +64,13 @@ export const MilestonesChecklistView: React.FC<Props> = ({
     },
   ]);
 
-  const toggleChecklist = (id: string) => {
+  const toggleChecklist = useCallback((id: string) => {
     setChecklist((prev) =>
       prev.map((item) => (item.id === id ? { ...item, completed: !item.completed } : item))
     );
-  };
+  }, []);
 
-  const handleCalendarSync = (milestone: MilestoneDate) => {
+  const handleCalendarSync = useCallback((milestone: MilestoneDate) => {
     const { calendarUrl, icsDownload } = syncToGoogleCalendar(milestone);
     
     // Open Google Calendar in new tab
@@ -82,9 +82,13 @@ export const MilestonesChecklistView: React.FC<Props> = ({
     setMilestones((prev) =>
       prev.map((m) => (m.id === milestone.id ? { ...m, isSyncedToCalendar: true } : m))
     );
-  };
+  }, []);
 
-  const completedChecklistCount = checklist.filter((c) => c.completed).length;
+  const handleExportClick = useCallback(() => {
+    downloadExecutiveAuditReport(contractFileName, activeCountry, clauses, beforeScore, afterScore);
+  }, [contractFileName, activeCountry, clauses, beforeScore, afterScore]);
+
+  const completedChecklistCount = useMemo(() => checklist.filter((c) => c.completed).length, [checklist]);
 
   return (
     <div className="space-y-6">
@@ -232,9 +236,7 @@ export const MilestonesChecklistView: React.FC<Props> = ({
         </div>
 
         <button
-          onClick={() =>
-            downloadExecutiveAuditReport(contractFileName, activeCountry, clauses, beforeScore, afterScore)
-          }
+          onClick={handleExportClick}
           className="px-5 py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-sky-600/30 transition-all flex items-center gap-2 cursor-pointer shrink-0"
         >
           <Download className="w-4 h-4" />
@@ -243,4 +245,6 @@ export const MilestonesChecklistView: React.FC<Props> = ({
       </div>
     </div>
   );
-};
+});
+
+MilestonesChecklistView.displayName = 'MilestonesChecklistView';

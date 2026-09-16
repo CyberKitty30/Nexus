@@ -6,7 +6,7 @@ interface Props {
   country: CountryConfig;
 }
 
-export const DisclaimerBanner: React.FC<Props> = ({ country }) => {
+export const DisclaimerBanner: React.FC<Props> = React.memo(({ country }) => {
   return (
     <div
       role="status"
@@ -26,4 +26,6 @@ export const DisclaimerBanner: React.FC<Props> = ({ country }) => {
       </div>
     </div>
   );
-};
+});
+
+DisclaimerBanner.displayName = 'DisclaimerBanner';

@@ -1,4 +1,4 @@
-import React, { useState, type ChangeEvent } from 'react';
+import React, { useState, useCallback, type ChangeEvent } from 'react';
 import { SAMPLE_CONTRACT_PRESETS } from '../data/sampleContracts';
 import { sanitizeInput } from '../middleware/security';
 import { FileUp, Cpu, CheckCircle2, Sparkles } from 'lucide-react';
@@ -10,7 +10,7 @@ interface Props {
   currentFileName: string;
 }
 
-export const DocumentParser: React.FC<Props> = ({
+export const DocumentParser: React.FC<Props> = React.memo(({
   onParseText,
   onLoadPreset,
   isAuditing,
@@ -19,7 +19,7 @@ export const DocumentParser: React.FC<Props> = ({
   const [rawText, setRawText] = useState<string>('');
   const [dragActive, setDragActive] = useState<boolean>(false);
 
-  const handleFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -32,9 +32,9 @@ export const DocumentParser: React.FC<Props> = ({
       }
     };
     reader.readAsText(file);
-  };
+  }, [onParseText]);
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setDragActive(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
@@ -49,7 +49,15 @@ export const DocumentParser: React.FC<Props> = ({
       };
       reader.readAsText(file);
     }
-  };
+  }, [onParseText]);
+
+  const handleManualAudit = useCallback(() => {
+    if (rawText.trim()) {
+      const { sanitizedText } = sanitizeInput(rawText);
+      onParseText(sanitizedText, 'Custom Uploaded Legal Snippet');
+      setRawText('');
+    }
+  }, [rawText, onParseText]);
 
   return (
     <section className="bg-slate-900 border border-slate-800 rounded-2xl p-5 mb-6 shadow-xl">
@@ -130,13 +138,7 @@ export const DocumentParser: React.FC<Props> = ({
             className="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500 resize-none font-mono"
           />
           <button
-            onClick={() => {
-              if (rawText.trim()) {
-                const { sanitizedText } = sanitizeInput(rawText);
-                onParseText(sanitizedText, 'Custom Uploaded Legal Snippet');
-                setRawText('');
-              }
-            }}
+            onClick={handleManualAudit}
             disabled={isAuditing || !rawText.trim()}
             className="px-5 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-lg shadow-emerald-950/50 transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
           >
@@ -147,4 +149,6 @@ export const DocumentParser: React.FC<Props> = ({
       </div>
     </section>
   );
-};
+});
+
+DocumentParser.displayName = 'DocumentParser';

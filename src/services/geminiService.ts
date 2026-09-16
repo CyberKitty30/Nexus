@@ -1,4 +1,3 @@
-import { GoogleGenAI } from '@google/genai';
 import type { FlaggedClause, CountryCode, ComplianceCategory, RiskLevel } from '../types/legal';
 import { SUPPORTED_COUNTRIES } from '../data/jurisdictions';
 
@@ -9,10 +8,14 @@ function resolveApiKey(userApiKey?: string): string | null {
   return typeof envKey === 'string' && envKey.trim() !== '' ? envKey.trim() : null;
 }
 
-function getGeminiClient(userApiKey?: string): GoogleGenAI | null {
+/**
+ * Dynamically imports GoogleGenAI SDK on demand to keep initial JavaScript bundle lightweight (<250kB).
+ */
+async function getGeminiClient(userApiKey?: string): Promise<import('@google/genai').GoogleGenAI | null> {
   const apiKey = resolveApiKey(userApiKey);
   if (!apiKey) return null;
   try {
+    const { GoogleGenAI } = await import('@google/genai');
     return new GoogleGenAI({ apiKey });
   } catch (err) {
     console.warn('Failed to initialize GoogleGenAI client:', err);
@@ -29,7 +32,7 @@ export async function analyzeClauseWithGemini(
   countryCode: CountryCode,
   apiKey?: string
 ): Promise<Partial<FlaggedClause>> {
-  const aiClient = getGeminiClient(apiKey);
+  const aiClient = await getGeminiClient(apiKey);
   const countryConfig = SUPPORTED_COUNTRIES[countryCode] ?? SUPPORTED_COUNTRIES.IN;
 
   if (aiClient) {
@@ -103,7 +106,7 @@ export async function askNexusAssistant(
   activeClause?: FlaggedClause,
   apiKey?: string
 ): Promise<{ text: string; citation?: string }> {
-  const aiClient = getGeminiClient(apiKey);
+  const aiClient = await getGeminiClient(apiKey);
   const countryConfig = SUPPORTED_COUNTRIES[countryCode] ?? SUPPORTED_COUNTRIES.IN;
 
   if (aiClient) {
